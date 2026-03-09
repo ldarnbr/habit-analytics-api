@@ -1,5 +1,6 @@
+import datetime
 from typing import List
-from sqlalchemy import ForeignKey, String, Float, Integer, UniqueConstraint
+from sqlalchemy import ForeignKey, String, Float, Integer, UniqueConstraint, Date
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 class Base(DeclarativeBase):
@@ -21,7 +22,7 @@ class DailyEntry(Base):
   log_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement\
                                       =True)
   person_id: Mapped[str] = mapped_column(ForeignKey("users.person_id"))
-  date: Mapped[str] = mapped_column(String)
+  date: Mapped[datetime.date] = mapped_column(Date)
   temperature_c: Mapped[float] = mapped_column(Float)
   activity_level: Mapped[str] = mapped_column(String)
   water_consumption_l: Mapped[float] = mapped_column(Float)
