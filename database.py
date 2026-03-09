@@ -1,7 +1,28 @@
 import datetime
 from typing import List
-from sqlalchemy import ForeignKey, String, Float, Integer, UniqueConstraint, Date
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import ForeignKey, String, Float, Integer, UniqueConstraint, Date, create_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
+
+DATABASE_URL = "sqlite:///./habit_tracker.db"
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+
+# sessionmaker generates identical sessions on demand. The autocommit false
+# flag ensures if any API crashes occur, there isnt broken/partial updates to 
+# the db. The sessionmaker is bound to the SQLite file using bind=engine.
+# This is a class that can be instantiated.
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+def get_db():
+  # create a new database session
+  db = SessionLocal()
+  try:
+    # yield effectively pauses the function. If it were to be returned,
+    # the session would close and the endpoints wouldn't execute.
+    yield db
+  finally:
+    # cleanup only after the endpoint is done. Necessary if theres a crash
+    # to guarantee all connections are closed.
+    db.close()
 
 class Base(DeclarativeBase):
   pass
