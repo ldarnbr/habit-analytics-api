@@ -28,3 +28,11 @@ class UserSchema(BaseModel):
   entries: List[DailyEntrySchema] = []
 
   model_config = ConfigDict(from_attributes=True)
+
+class ActivityAverageSchema(BaseModel):
+  activity_level: str
+  average_water_l: float
+
+class UserActivityAggregationResponse(BaseModel):
+  person_id: str
+  activity_averages: List[ActivityAverageSchema]

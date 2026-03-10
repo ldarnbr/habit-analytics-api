@@ -1,8 +1,8 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import select
-from database import get_db, User
-from schemas import UserSchema
+from sqlalchemy import select, func
+from database import get_db, User, DailyEntry
+from schemas import UserSchema, UserActivityAggregationResponse
 
 app = FastAPI(
   title="Habit Analytics API",
@@ -23,6 +23,38 @@ def get_user_with_entries(person_id: str, db: Session = Depends(get_db)):
     raise HTTPException(status_code=404, detail="Error: User not found")
   
   return db_user
+
+@app.get("/users/{person_id}/analytics/activity", response_model=UserActivityAggregationResponse)
+def get_user_activity_aggregation(person_id: str, db: Session = Depends(get_db)):
+  
+  # order of operations: 
+  # filter by user (where) -> 
+  # group entries by activity (group_by) ->
+  # average the groups (func.avg)
+  stmt = (
+    select(
+      DailyEntry.activity_level,
+      func.avg(DailyEntry.water_consumption_l).label("average_water_l")
+    ).where(DailyEntry.person_id == person_id).group_by(DailyEntry.activity_level)
+  )
+
+  results = db.execute(stmt).all()
+
+  # handle edge cases where a user has no entries at a given activity level
+  checked_averages = []
+  for row in results:
+    checked_averages.append({
+      "activity_level": row.activity_level,
+      "average_water_l": row.average_water_l
+    })
+  
+  # returns an actual dictionary structure so need for ConfigDict in the Schema
+  # to allow reading from dot notation objects
+  return {
+    "person_id": person_id,
+    "activity_averages": checked_averages
+  }
+
 
 @app.get("/")
 def read_root():
