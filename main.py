@@ -34,7 +34,7 @@ def get_user_activity_aggregation(person_id: str, db: Session = Depends(get_db))
   stmt = (
     select(
       DailyEntry.activity_level,
-      func.avg(DailyEntry.water_consumption_l).label("average_water_l")
+      func.round(func.avg(DailyEntry.water_consumption_l), 2).label("average_water_l")
     ).where(DailyEntry.person_id == person_id).group_by(DailyEntry.activity_level)
   )
 
