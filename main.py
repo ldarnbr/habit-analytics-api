@@ -57,13 +57,13 @@ def get_user_activity_aggregation(person_id: str, db: Session = Depends(get_db))
   }
 
 @app.get("/users/{person_id}/analytics/streaks", response_model=StreakResponse)
-def get_user_streaks(person_id: str, db: Session = Depends(get_db)):
+def get_user_streaks(person_id: str, threshold: float = 2.0, db: Session = Depends(get_db)):
   
   # hard codes threshold water consumption to be considered a streak
   # (might adjust this later to allow the user to choose their threshold)
   stmt = (
     select(DailyEntry.date).where(DailyEntry.person_id == person_id)
-    .where(DailyEntry.water_consumption_l >= 2.0)
+    .where(DailyEntry.water_consumption_l >= threshold)
     .order_by(DailyEntry.date.asc())
   )
 
@@ -74,6 +74,12 @@ def get_user_streaks(person_id: str, db: Session = Depends(get_db)):
   last_date = None
   current_streak = 0
   longest_streak = 0
+
+  # Note: This loop will differ in production, because as it is, it shows the
+  # current streak right up to the last date of entry. The dataset being used
+  # is for 2025 only, so current streak would always show 0 in the year 2026.
+  # In production it would be more appropriate to compare the last entry to
+  # the current date, and if they differ then reset the streak to 0.
 
   for current_date in above_threshold_dates:
     # start the streak if not already counting
@@ -100,14 +106,6 @@ def get_user_streaks(person_id: str, db: Session = Depends(get_db)):
     "current_streak": current_streak,
     "longest_streak": longest_streak
   }
-
-
-
-
-
-
-
-
 
 @app.get("/")
 def read_root():
