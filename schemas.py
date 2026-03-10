@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 from datetime import date
-from typing import List
+from typing import List, Dict
 
 # Pydantic will enforce the below type hints, preventing SQLaclchemy passing the
 # wrong datatype into the columns e.g. string into temperature_c.
@@ -41,3 +41,7 @@ class StreakResponse(BaseModel):
   person_id: str
   current_streak: int
   longest_streak: int
+
+class HeatmapResponse(BaseModel):
+  person_id: str
+  heatmap_data: Dict[str, float]

@@ -1,9 +1,9 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from database import get_db, User, DailyEntry
-from schemas import UserSchema, UserActivityAggregationResponse, StreakResponse
-from datetime import timedelta
+from schemas import UserSchema, UserActivityAggregationResponse, StreakResponse, HeatmapResponse
+from datetime import timedelta, date
 
 app = FastAPI(
   title="Habit Analytics API",
@@ -104,6 +104,33 @@ def get_user_streaks(person_id: str, threshold: float = 2.0, db: Session = Depen
     "person_id": person_id,
     "current_streak": current_streak,
     "longest_streak": longest_streak
+  }
+
+@app.get("/users/{person_id}/analytics/heatmap", response_model=HeatmapResponse)
+def get_user_heatmap(
+  person_id: str, 
+  start_date: date = Query(description="Format: YYYY-MM-DD", example="2025-01-01"), 
+  end_date: date = Query(description="Format: YYYY-MM-DD", example="2025-12-31"), 
+  db: Session = Depends(get_db)
+  ):
+  
+  # includes only entries within the time period specified, for one user
+  stmt = (
+    select(DailyEntry).where(DailyEntry.person_id == person_id)
+    .where(DailyEntry.date >= start_date)
+    .where(DailyEntry.date <= end_date)
+  )
+
+  entries = db.execute(stmt).scalars().all()
+
+  heatmap = {}
+  for entry in entries:
+    # key: date object converted to string, value: water consumption in litres
+    heatmap[str(entry.date)] = entry.water_consumption_l
+  
+  return {
+    "person_id": person_id,
+    "heatmap_data": heatmap
   }
 
 @app.get("/")
