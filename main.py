@@ -141,6 +141,11 @@ def create_entry(
   person_id: str, entry_data: EntryCreate, db: Session = Depends(get_db)
 ):
   
+  # check that the user already has entries in the database first
+  user = db.execute(select(User).where(User.person_id == person_id)).scalar_one_or_none()
+  if user is None:
+    raise HTTPException(status_code=404, details="Error: User not found")
+  
   # need to map validated Pydantic data into SQLAlchemy model DailyEntry
   new_entry = DailyEntry(
     person_id=person_id,

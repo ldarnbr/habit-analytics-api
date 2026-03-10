@@ -1,11 +1,13 @@
 from pydantic import BaseModel, ConfigDict
 from datetime import date
-from typing import List, Dict
+from typing import List, Dict, Literal
 
 class EntryCreate(BaseModel):
   date: date
   temperature_c: float
-  activity_level: str
+  # REFERENCE: 
+  # https://stackoverflow.com/questions/74366289/how-to-add-drop-down-menu-to-swagger-ui-autodocs-based-on-basemodel-using-fastap
+  activity_level: Literal['Low', 'Medium', 'High']
   water_consumption_l: float
 
 # Pydantic will enforce the below type hints, preventing SQLaclchemy passing the
