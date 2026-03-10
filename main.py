@@ -1,8 +1,9 @@
 from fastapi import FastAPI, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, func
 from database import get_db, User, DailyEntry
-from schemas import UserSchema, UserActivityAggregationResponse, StreakResponse, HeatmapResponse
+from schemas import UserSchema, UserActivityAggregationResponse, StreakResponse, HeatmapResponse, DailyEntrySchema, EntryCreate
 from datetime import timedelta, date
 
 app = FastAPI(
@@ -132,6 +133,39 @@ def get_user_heatmap(
     "person_id": person_id,
     "heatmap_data": heatmap
   }
+
+@app.post("/users/{person_id}/entries", response_model=DailyEntrySchema)
+def create_entry(
+  # FastAPI will look for JSON in the incoming request for the entry_data
+  # validates JSON data with pydantic in the EntryCreate schema
+  person_id: str, entry_data: EntryCreate, db: Session = Depends(get_db)
+):
+  
+  # need to map validated Pydantic data into SQLAlchemy model DailyEntry
+  new_entry = DailyEntry(
+    person_id=person_id,
+    date=entry_data.date,
+    temperature_c=entry_data.temperature_c,
+    activity_level=entry_data.activity_level,
+    water_consumption_l=entry_data.water_consumption_l
+  )
+
+  db.add(new_entry)
+
+  try:
+    db.commit()
+    # database auto increments the log id which new_entry doesn't have yet
+    # refresh allows the python variable to catch up and get the log id
+    db.refresh(new_entry)
+    return new_entry
+  except IntegrityError:
+    db.rollback()
+    raise HTTPException(status_code=400, detail="Entry for this date exists already.")
+
+
+
+
+
 
 @app.get("/")
 def read_root():

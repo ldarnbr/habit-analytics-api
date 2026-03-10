@@ -2,6 +2,12 @@ from pydantic import BaseModel, ConfigDict
 from datetime import date
 from typing import List, Dict
 
+class EntryCreate(BaseModel):
+  date: date
+  temperature_c: float
+  activity_level: str
+  water_consumption_l: float
+
 # Pydantic will enforce the below type hints, preventing SQLaclchemy passing the
 # wrong datatype into the columns e.g. string into temperature_c.
 class DailyEntrySchema(BaseModel):
