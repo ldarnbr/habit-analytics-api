@@ -2,7 +2,8 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from database import get_db, User, DailyEntry
-from schemas import UserSchema, UserActivityAggregationResponse
+from schemas import UserSchema, UserActivityAggregationResponse, StreakResponse
+from datetime import timedelta
 
 app = FastAPI(
   title="Habit Analytics API",
@@ -54,6 +55,58 @@ def get_user_activity_aggregation(person_id: str, db: Session = Depends(get_db))
     "person_id": person_id,
     "activity_averages": checked_averages
   }
+
+@app.get("/users/{person_id}/analytics/streaks", response_model=StreakResponse)
+def get_user_streaks(person_id: str, db: Session = Depends(get_db)):
+  
+  # hard codes threshold water consumption to be considered a streak
+  # (might adjust this later to allow the user to choose their threshold)
+  stmt = (
+    select(DailyEntry.date).where(DailyEntry.person_id == person_id)
+    .where(DailyEntry.water_consumption_l >= 2.0)
+    .order_by(DailyEntry.date.asc())
+  )
+
+  # grab all the rows above the threshold in a list format (scalars)
+  above_threshold_dates = db.execute(stmt).scalars().all()
+
+  # trackers
+  last_date = None
+  current_streak = 0
+  longest_streak = 0
+
+  for current_date in above_threshold_dates:
+    # start the streak if not already counting
+    if last_date is None:
+      current_streak = 1
+    
+    # only increment streak if exactly one day has passed
+    elif current_date - last_date == timedelta(days=1):
+      current_streak += 1
+    
+    # reset the streak to 1 if streak gets broken (more than 1 day passed)
+    elif (current_date - last_date) > timedelta(days=1):
+      current_streak = 1
+    
+    # keep storing the longest streak counts in a separate if statement
+    if current_streak > longest_streak:
+      longest_streak = current_streak
+    
+    # update state for next iteration
+    last_date = current_date
+
+  return {
+    "person_id": person_id,
+    "current_streak": current_streak,
+    "longest_streak": longest_streak
+  }
+
+
+
+
+
+
+
 
 
 @app.get("/")

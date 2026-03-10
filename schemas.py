@@ -36,3 +36,8 @@ class ActivityAverageSchema(BaseModel):
 class UserActivityAggregationResponse(BaseModel):
   person_id: str
   activity_averages: List[ActivityAverageSchema]
+
+class StreakResponse(BaseModel):
+  person_id: str
+  current_streak: int
+  longest_streak: int
