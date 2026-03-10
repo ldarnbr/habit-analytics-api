@@ -60,7 +60,6 @@ def get_user_activity_aggregation(person_id: str, db: Session = Depends(get_db))
 def get_user_streaks(person_id: str, threshold: float = 2.0, db: Session = Depends(get_db)):
   
   # hard codes threshold water consumption to be considered a streak
-  # (might adjust this later to allow the user to choose their threshold)
   stmt = (
     select(DailyEntry.date).where(DailyEntry.person_id == person_id)
     .where(DailyEntry.water_consumption_l >= threshold)
