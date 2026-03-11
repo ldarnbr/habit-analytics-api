@@ -11,23 +11,29 @@ app = FastAPI(
   description="API which tracks habits and provides analytics."
 )
 
+# reusable function to check user exists in the database before actioning
+# a request
+def verify_user_exists(person_id: str, db: Session = Depends(get_db)):
+  user = db.execute(select(User). where(User.person_id == person_id)).scalar_one_or_none()
+  
+  if user is None:
+    raise HTTPException(status_code=404, detail="Error: User not found")
+  
+  return person_id
+
 @app.get("/users/{person_id}", response_model=UserSchema)
-def get_user_with_entries(person_id: str, db: Session = Depends(get_db)):
+def get_user_with_entries(person_id: str = Depends(verify_user_exists), db: Session = Depends(get_db)):
 
   # SQLAlchemy 2.0 select statement to filter by person_id
   stmt = select(User).where(User.person_id == person_id)
   # session executes the statement and selects a single User object or if
   # multiple rows are returned, will produce an error.
   db_user = db.execute(stmt).scalar_one_or_none()
-
-  # explicitely handle the case when user is not found
-  if db_user is None:
-    raise HTTPException(status_code=404, detail="Error: User not found")
   
   return db_user
 
 @app.get("/users/{person_id}/analytics/activity", response_model=UserActivityAggregationResponse)
-def get_user_activity_aggregation(person_id: str, db: Session = Depends(get_db)):
+def get_user_activity_aggregation(person_id: str = Depends(verify_user_exists), db: Session = Depends(get_db)):
   
   # order of operations: 
   # filter by user (where) -> 
@@ -58,7 +64,7 @@ def get_user_activity_aggregation(person_id: str, db: Session = Depends(get_db))
   }
 
 @app.get("/users/{person_id}/analytics/streaks", response_model=StreakResponse)
-def get_user_streaks(person_id: str, threshold: float = 2.0, db: Session = Depends(get_db)):
+def get_user_streaks(person_id: str = Depends(verify_user_exists), threshold: float = 2.0, db: Session = Depends(get_db)):
   
   # hard codes threshold water consumption to be considered a streak
   stmt = (
@@ -109,7 +115,7 @@ def get_user_streaks(person_id: str, threshold: float = 2.0, db: Session = Depen
 
 @app.get("/users/{person_id}/analytics/heatmap", response_model=HeatmapResponse)
 def get_user_heatmap(
-  person_id: str, 
+  person_id: str = Depends(verify_user_exists), 
   start_date: date = Query(description="Format: YYYY-MM-DD", example="2025-01-01"), 
   end_date: date = Query(description="Format: YYYY-MM-DD", example="2025-12-31"), 
   db: Session = Depends(get_db)
@@ -138,14 +144,9 @@ def get_user_heatmap(
 def create_entry(
   # FastAPI will look for JSON in the incoming request for the entry_data
   # validates JSON data with pydantic in the EntryCreate schema
-  person_id: str, entry_data: EntryCreate, db: Session = Depends(get_db)
+  entry_data: EntryCreate, person_id: str = Depends(verify_user_exists), db: Session = Depends(get_db)
 ):
-  
-  # check that the user already has entries in the database first
-  user = db.execute(select(User).where(User.person_id == person_id)).scalar_one_or_none()
-  if user is None:
-    raise HTTPException(status_code=404, detail="Error: User not found")
-  
+ 
   # need to map validated Pydantic data into SQLAlchemy model DailyEntry
   new_entry = DailyEntry(
     person_id=person_id,
@@ -169,9 +170,9 @@ def create_entry(
 
 @app.patch("/users/{person_id}/entries/{entry_date}", response_model=DailyEntrySchema)
 def update_entry(
-  person_id: str,
   entry_date: date,
   entry_data: EntryUpdate,
+  person_id: str = Depends(verify_user_exists),
   db: Session = Depends(get_db)
 ):
   
@@ -188,7 +189,7 @@ def update_entry(
     raise HTTPException(status_code=404, detail="Error: User has no entry at this date")
 
   # get the fields the user sent
-  updated_data = entry_data.model_dump(exclude_unset=True)
+  updated_data = entry_data.model_dump(exclude_unset=True, exclude_none=True)
 
   # apply the changes to the database object for the attribute the user sent
   for key, value in updated_data.items():

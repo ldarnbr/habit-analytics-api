@@ -24,7 +24,6 @@ class EntryUpdate(BaseModel):
   activity_level: Optional[Literal['Low', 'Medium', 'High']] = None
   water_consumption_l: Optional[float] = Field(None, ge=0)
 
-
 # Pydantic will enforce the below type hints, preventing SQLaclchemy passing the
 # wrong datatype into the columns e.g. string into temperature_c.
 class DailyEntrySchema(BaseModel):
