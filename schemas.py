@@ -1,14 +1,23 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from datetime import date
 from typing import List, Dict, Literal
 
 class EntryCreate(BaseModel):
   date: date
-  temperature_c: float
+  # restrict range to sensible temperatures
+  temperature_c: float = Field(..., ge=-50, le=60)
   # REFERENCE: 
   # https://stackoverflow.com/questions/74366289/how-to-add-drop-down-menu-to-swagger-ui-autodocs-based-on-basemodel-using-fastap
   activity_level: Literal['Low', 'Medium', 'High']
-  water_consumption_l: float
+  # can't log negative water consumption
+  water_consumption_l: float = Field(..., ge=0)
+
+  @field_validator('date')
+  @classmethod
+  def check_date_future(cls, input: date):
+    if input > date.today():
+      raise ValueError('Entry date cannot be in the future.')
+    return input
 
 # Pydantic will enforce the below type hints, preventing SQLaclchemy passing the
 # wrong datatype into the columns e.g. string into temperature_c.
