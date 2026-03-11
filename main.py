@@ -3,12 +3,22 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, func
 from database import get_db, User, DailyEntry
-from schemas import UserSchema, UserActivityAggregationResponse, StreakResponse, HeatmapResponse, DailyEntrySchema, EntryCreate, EntryUpdate
+from schemas import UserSchema, UserActivityAggregationResponse, StreakResponse,\
+    HeatmapResponse, DailyEntrySchema, EntryCreate, EntryUpdate, WeeklyTrendResponse
 from datetime import timedelta, date
 
 app = FastAPI(
-  title="Habit Analytics API",
-  description="API which tracks habits and provides analytics."
+  title="Water Consumption Streak API",
+  description="A comprehensive Web Services API for tracking daily hydration",
+  version="1.0.0",
+  contact={
+    "name": "L Brown",
+    "email": "sc23ldb@leeds.ac.uk",
+  },
+  license_info={
+    "name": "Apache 2.0",
+    "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+  },
 )
 
 # reusable function to check user exists in the database before actioning
@@ -23,7 +33,9 @@ def verify_user_exists(person_id: str, db: Session = Depends(get_db)):
 
 @app.get("/users/{person_id}", response_model=UserSchema)
 def get_user_with_entries(person_id: str = Depends(verify_user_exists), db: Session = Depends(get_db)):
-
+  """
+  Returns all entries for a specified user.
+  """
   # SQLAlchemy 2.0 select statement to filter by person_id
   stmt = select(User).where(User.person_id == person_id)
   # session executes the statement and selects a single User object or if
@@ -34,7 +46,10 @@ def get_user_with_entries(person_id: str = Depends(verify_user_exists), db: Sess
 
 @app.get("/users/{person_id}/analytics/activity", response_model=UserActivityAggregationResponse)
 def get_user_activity_aggregation(person_id: str = Depends(verify_user_exists), db: Session = Depends(get_db)):
-  
+  """
+  Calculates the average water consumption in l for all entries in each tier of 
+  reported activity level (Low, Medium, High) for a specified user.
+  """
   # order of operations: 
   # filter by user (where) -> 
   # group entries by activity (group_by) ->
@@ -65,7 +80,12 @@ def get_user_activity_aggregation(person_id: str = Depends(verify_user_exists), 
 
 @app.get("/users/{person_id}/analytics/streaks", response_model=StreakResponse)
 def get_user_streaks(person_id: str = Depends(verify_user_exists), threshold: float = 2.0, db: Session = Depends(get_db)):
-  
+  """
+  Calculates the user's longest hydration streak above the desired threshold.
+  Also shows the users ongoing streak.
+
+  **Threshold**: The minimum water consumed in litres to count as a successful day. Defaults to 2.0l.
+  """
   # hard codes threshold water consumption to be considered a streak
   stmt = (
     select(DailyEntry.date).where(DailyEntry.person_id == person_id)
@@ -120,6 +140,11 @@ def get_user_heatmap(
   end_date: date = Query(description="Format: YYYY-MM-DD", example="2025-12-31"), 
   db: Session = Depends(get_db)
   ):
+
+  """
+  Returns the water consumpion (l) for each entry within the date range specified
+  for a specified user.
+  """
   
   # includes only entries within the time period specified, for one user
   stmt = (
@@ -138,6 +163,68 @@ def get_user_heatmap(
   return {
     "person_id": person_id,
     "heatmap_data": heatmap
+  }
+
+@app.get("/users/{person_id}/analytics/trends", response_model=WeeklyTrendResponse)
+def get_weekly_trends(
+  target_date: date,
+  person_id: str = Depends(verify_user_exists),
+  db: Session = Depends(get_db)
+):
+  # week start dates
+  start_current = target_date - timedelta(days=7)
+  start_last = target_date - timedelta(days=14)
+
+  # one trip to the database to grab all 14 days
+  stmt = select(DailyEntry).where(
+    DailyEntry.person_id == person_id,
+    DailyEntry.date > start_last,
+    DailyEntry.date <= target_date
+  )
+  entries = db.execute(stmt).scalars().all()
+
+  current_week_entries = []
+  last_week_entries = []
+
+  for entry in entries:
+    if entry.date > start_current:
+      current_week_entries.append(entry.water_consumption_l)
+    else:
+      last_week_entries.append(entry.water_consumption_l)
+
+  # if there is some entries, calculate an average, else set a default avg of 0
+  # to avoid divide by zero errors.
+  if current_week_entries:
+    current_avg = sum(current_week_entries) / len(current_week_entries)
+  else:
+    current_avg = 0
+
+  if last_week_entries:
+    last_avg = sum(last_week_entries) / len(last_week_entries)
+  else:
+    last_avg = 0
+
+  # calculate percentage change only if there is last weeks avg to compare to
+  if last_avg == 0:
+    percentage_change = None
+    trend_direction = "insufficient_data"
+  else:
+    percentage_change = round(((current_avg - last_avg) / last_avg) * 100, 2)
+
+    if percentage_change > 0:
+      trend_direction = "up"
+    elif percentage_change < 0:
+      trend_direction = "down"
+    else:
+      trend_direction = "flat"
+  
+  return {
+    "person_id": person_id,
+    "target_date": target_date,
+    "current_week_avg": round(current_avg, 2),
+    "last_week_avg": round(last_avg, 2),
+    "percentage_change": percentage_change,
+    "trend_direction": trend_direction
   }
 
 @app.post("/users/{person_id}/entries", response_model=DailyEntrySchema)

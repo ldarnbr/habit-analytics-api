@@ -67,3 +67,12 @@ class StreakResponse(BaseModel):
 class HeatmapResponse(BaseModel):
   person_id: str
   heatmap_data: Dict[str, float]
+
+class WeeklyTrendResponse(BaseModel):
+  person_id: str
+  target_date: date
+  current_week_avg: float
+  last_week_avg: float
+  # percentage change isn't always able to be determined (insufficient data)
+  percentage_change: Optional[float] = None
+  trend_direction: Literal["up", "down", "flat", "insufficient_data"]
