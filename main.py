@@ -31,10 +31,18 @@ def verify_user_exists(person_id: str, db: Session = Depends(get_db)):
   
   return person_id
 
-@app.get("/users/{person_id}", response_model=UserSchema)
+# User management --------------------------------------------------------------
+
+@app.get(
+  "/users/{person_id}",
+  response_model=UserSchema,
+  tags=["User Management"],
+  summary="Get All User Entries",
+  responses={404: {"description": "Error: User not found"}}
+)
 def get_user_with_entries(person_id: str = Depends(verify_user_exists), db: Session = Depends(get_db)):
   """
-  Returns all entries for a specified user.
+  Retrieves a full list of daily logged entries form a specified user.
   """
   # SQLAlchemy 2.0 select statement to filter by person_id
   stmt = select(User).where(User.person_id == person_id)
@@ -44,11 +52,19 @@ def get_user_with_entries(person_id: str = Depends(verify_user_exists), db: Sess
   
   return db_user
 
-@app.get("/users/{person_id}/analytics/activity", response_model=UserActivityAggregationResponse)
+# Analytics --------------------------------------------------------------------
+
+@app.get(
+  "/users/{person_id}/analytics/activity",
+  response_model=UserActivityAggregationResponse,
+  tags=["Analytics"],
+  summary="Get Activity Level Averages",
+  responses={404: {"description": "Error: User not found"}}
+)
 def get_user_activity_aggregation(person_id: str = Depends(verify_user_exists), db: Session = Depends(get_db)):
   """
-  Calculates the average water consumption in l for all entries in each tier of 
-  reported activity level (Low, Medium, High) for a specified user.
+  Calculates the average water consumption (in litres) for all entries grouped
+  by reported activity level (Low, Medium, High).
   """
   # order of operations: 
   # filter by user (where) -> 
@@ -78,11 +94,16 @@ def get_user_activity_aggregation(person_id: str = Depends(verify_user_exists), 
     "activity_averages": checked_averages
   }
 
-@app.get("/users/{person_id}/analytics/streaks", response_model=StreakResponse)
+@app.get(
+  "/users/{person_id}/analytics/streaks",
+  response_model=StreakResponse,
+  tags=["Analytics"],
+  summary="Calculate Hydration Streaks",
+  responses={404: {"description": "Error: User not found"}}
+)
 def get_user_streaks(person_id: str = Depends(verify_user_exists), threshold: float = 2.0, db: Session = Depends(get_db)):
   """
-  Calculates the user's longest hydration streak above the desired threshold.
-  Also shows the users ongoing streak.
+  Calculates the user's longest hydration streak and ongoing current streak above the desired threshold.
 
   **Threshold**: The minimum water consumed in litres to count as a successful day. Defaults to 2.0l.
   """
@@ -133,7 +154,13 @@ def get_user_streaks(person_id: str = Depends(verify_user_exists), threshold: fl
     "longest_streak": longest_streak
   }
 
-@app.get("/users/{person_id}/analytics/heatmap", response_model=HeatmapResponse)
+@app.get(
+  "/users/{person_id}/analytics/heatmap",
+  response_model=HeatmapResponse,
+  tags=["Analytics"],
+  summary="Get Hydration Heatmap Data",
+  responses={404: {"description": "Error: User not found"}}
+)
 def get_user_heatmap(
   person_id: str = Depends(verify_user_exists), 
   start_date: date = Query(description="Format: YYYY-MM-DD", example="2025-01-01"), 
@@ -142,10 +169,9 @@ def get_user_heatmap(
   ):
 
   """
-  Returns the water consumpion (l) for each entry within the date range specified
-  for a specified user.
+  Returns a dictionary mapping dates to water consumption (in litres) between a specified
+  date range for a frontend calendar heatmap.
   """
-  
   # includes only entries within the time period specified, for one user
   stmt = (
     select(DailyEntry).where(DailyEntry.person_id == person_id)
@@ -165,12 +191,23 @@ def get_user_heatmap(
     "heatmap_data": heatmap
   }
 
-@app.get("/users/{person_id}/analytics/trends", response_model=WeeklyTrendResponse)
+@app.get(
+  "/users/{person_id}/analytics/trends",
+  response_model=WeeklyTrendResponse,
+  tags=["Analytics"],
+  summary="Calculate Week to Week Trends",
+  responses={404: {"description": "Error: User not found"}}
+)
 def get_weekly_trends(
   target_date: date,
   person_id: str = Depends(verify_user_exists),
   db: Session = Depends(get_db)
 ):
+  """
+  Compares a user's average water consumption over the previous 7 days against
+  the 7 days before that. Returns a percentage change and trend direction
+  ('up', 'down', 'flat', 'insufficient_data').
+  """
   # week start dates
   start_current = target_date - timedelta(days=7)
   start_last = target_date - timedelta(days=14)
@@ -227,13 +264,27 @@ def get_weekly_trends(
     "trend_direction": trend_direction
   }
 
-@app.post("/users/{person_id}/entries", response_model=DailyEntrySchema)
+# Daily Entries ----------------------------------------------------------------
+
+@app.post(
+  "/users/{person_id}/entries",
+  response_model=DailyEntrySchema,
+  tags=["Daily Entries"],
+  summary="Log a Daily Entry",
+  responses={
+    400: {"description": "Entry for this date already exists."},
+    404: {"description": "Error: User not found"},
+    422: {"description": "Validation Error (e.g., negative water consumption)"},
+  }
+)
 def create_entry(
   # FastAPI will look for JSON in the incoming request for the entry_data
   # validates JSON data with pydantic in the EntryCreate schema
   entry_data: EntryCreate, person_id: str = Depends(verify_user_exists), db: Session = Depends(get_db)
 ):
- 
+  """
+  Logs a new hydration/activity/temperature entry for a specific user.
+  """
   # need to map validated Pydantic data into SQLAlchemy model DailyEntry
   new_entry = DailyEntry(
     person_id=person_id,
@@ -255,7 +306,16 @@ def create_entry(
     db.rollback()
     raise HTTPException(status_code=400, detail="Entry for this date exists already.")
 
-@app.patch("/users/{person_id}/entries/{entry_date}", response_model=DailyEntrySchema)
+@app.patch(
+  "/users/{person_id}/entries/{entry_date}", 
+  response_model=DailyEntrySchema,
+  tags=["Daily Entries"],
+  summary="Update an Entry",
+  responses={
+    404: {"description": "Error: User or Entry not found"},
+    422: {"description": "Validation Error (e.g. null values)"}
+  }
+)
 def update_entry(
   entry_date: date,
   entry_data: EntryUpdate,
@@ -263,6 +323,10 @@ def update_entry(
   db: Session = Depends(get_db)
 ):
   
+  """
+  Partially updates an existing daily entry. Only provided fields in the JSON
+  body will be modified.
+  """
   # find the exact entry from person id and date identifiers
   stmt = select(DailyEntry).where(
     DailyEntry.person_id == person_id, 
@@ -287,12 +351,22 @@ def update_entry(
 
   return db_entry
 
-@app.delete("/users/{person_id}/entries/{entry_date}")
+@app.delete(
+  "/users/{person_id}/entries/{entry_date}",
+  tags=["Daily Entries"],
+  summary="Delete a Daily Entry",
+  responses={
+    404: {"description": "Error: User or Entry not found"}
+  }
+)
 def delete_entry(
   entry_date: date,
   person_id: str = Depends(verify_user_exists),
   db: Session = Depends(get_db)
 ):
+  """
+  Permanently removes a specific daily entry from the database.
+  """
   stmt = select(DailyEntry).where(
     DailyEntry.person_id == person_id,
     DailyEntry.date == entry_date
@@ -307,10 +381,25 @@ def delete_entry(
 
   return {"message": f"Entry for {entry_date} by User: {person_id} successfully deleted."}
 
-@app.get("/")
+# System -----------------------------------------------------------------------
+@app.get(
+  "/",
+  tags=["System"],
+  summary="Root Endpoint"
+)
 def read_root():
+  """
+  Welcome to the Hydration Analytics API.
+  """
   return {"message": "Hello World"}
 
-@app.get("/health")
+@app.get(
+  "/health",
+  tags=["System"],
+  summary="Health Check"
+)
 def health_check():
+  """
+  Returns the server status.
+  """
   return {"status": "ok", "message": "Server is running smoothly."}
