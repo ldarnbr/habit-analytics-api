@@ -1,13 +1,18 @@
-# Habit Analytics API
+# Hydration Analytics API
 
 ## Project Description
-This API tracks daily habits and provides per user analytics. Core technologies
-used are Python, FastAPI and SQLite.
+A comprehensive RESTful Web Services API build with Python, FastAPI, SQLAlchemy 2.0 and SQLite.
+This API provides CRUD operations to manage the full lifecycle of recording daily hydration
+logs for individual users. It provides advanced statistical analytics such as weekly hydration trends,
+hydration averages corresponding to various user activity levels as well as a streak counter for meeting
+custom daily water consumption goals.
 
-## Setup
+The database is populated using the [Daily Water Consumption Dataset](https://www.kaggle.com/datasets/mirzayasirabdullah07/daily-water-consumption-dataset).
+
+## Setup Instructions
 1. Clone the repository to your local machine.
 ```bash
-git clone https://github.com/ldarnbr/habit-analytics-api.git
+git clone [https://github.com/ldarnbr/habit-analytics-api.git](https://github.com/ldarnbr/habit-analytics-api.git)
 ```
 2. Create a virtual environment to store project dependencies.
 ```bash
@@ -17,6 +22,9 @@ python -m venv venv
 ```bash
 # Windows
 venv/Scripts/Activate
+
+# Mac/Linux
+source venv/bin/activate
 ```
 4. Install all dependencies.
 ```bash
@@ -24,8 +32,9 @@ pip install -r requirements.txt
 ```
 5. Run the server.
 ```bash
-uvicorn main:app --reload
+fastapi dev main.py
 ```
 
 ## Documentation
-Please see the provided PDF in the repository.
+API documentation generated using Swagger UI is provided in this repository.
+Please see the API_Documentation.pdf file located in the documentation directory.
