@@ -12,7 +12,7 @@ The database is populated using the [Daily Water Consumption Dataset](https://ww
 ## Setup Instructions
 1. Clone the repository to your local machine.
 ```bash
-git clone [https://github.com/ldarnbr/habit-analytics-api.git](https://github.com/ldarnbr/habit-analytics-api.git)
+git clone https://github.com/ldarnbr/habit-analytics-api.git
 ```
 2. Create a virtual environment to store project dependencies.
 ```bash
