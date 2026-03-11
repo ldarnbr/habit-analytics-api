@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, func
 from database import get_db, User, DailyEntry
-from schemas import UserSchema, UserActivityAggregationResponse, StreakResponse, HeatmapResponse, DailyEntrySchema, EntryCreate
+from schemas import UserSchema, UserActivityAggregationResponse, StreakResponse, HeatmapResponse, DailyEntrySchema, EntryCreate, EntryUpdate
 from datetime import timedelta, date
 
 app = FastAPI(
@@ -167,10 +167,37 @@ def create_entry(
     db.rollback()
     raise HTTPException(status_code=400, detail="Entry for this date exists already.")
 
+@app.patch("/users/{person_id}/entries/{entry_date}", response_model=DailyEntrySchema)
+def update_entry(
+  person_id: str,
+  entry_date: date,
+  entry_data: EntryUpdate,
+  db: Session = Depends(get_db)
+):
+  
+  # find the exact entry from person id and date identifiers
+  stmt = select(DailyEntry).where(
+    DailyEntry.person_id == person_id, 
+    DailyEntry.date == entry_date
+  )
 
+  # should return one entry only, else None
+  db_entry = db.execute(stmt).scalar_one_or_none()
 
+  if db_entry is None:
+    raise HTTPException(status_code=404, detail="Error: User has no entry at this date")
 
+  # get the fields the user sent
+  updated_data = entry_data.model_dump(exclude_unset=True)
 
+  # apply the changes to the database object for the attribute the user sent
+  for key, value in updated_data.items():
+    setattr(db_entry, key, value)
+
+  db.commit()
+  db.refresh(db_entry)
+
+  return db_entry
 
 @app.get("/")
 def read_root():

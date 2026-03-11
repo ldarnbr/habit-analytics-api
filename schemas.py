@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from datetime import date
-from typing import List, Dict, Literal
+from typing import List, Dict, Literal, Optional
 
 class EntryCreate(BaseModel):
   date: date
@@ -18,6 +18,12 @@ class EntryCreate(BaseModel):
     if input > date.today():
       raise ValueError('Entry date cannot be in the future.')
     return input
+  
+class EntryUpdate(BaseModel):
+  temperature_c: Optional[float] = Field(None, ge=-50, le=60)
+  activity_level: Optional[Literal['Low', 'Medium', 'High']] = None
+  water_consumption_l: Optional[float] = Field(None, ge=0)
+
 
 # Pydantic will enforce the below type hints, preventing SQLaclchemy passing the
 # wrong datatype into the columns e.g. string into temperature_c.
