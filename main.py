@@ -200,6 +200,26 @@ def update_entry(
 
   return db_entry
 
+@app.delete("/users/{person_id}/entries/{entry_date}")
+def delete_entry(
+  entry_date: date,
+  person_id: str = Depends(verify_user_exists),
+  db: Session = Depends(get_db)
+):
+  stmt = select(DailyEntry).where(
+    DailyEntry.person_id == person_id,
+    DailyEntry.date == entry_date
+  )
+  db_entry = db.execute(stmt).scalar_one_or_none()
+
+  if db_entry is None:
+    raise HTTPException(status_code=404, detail="Error: Entry not found for this date.")
+  
+  db.delete(db_entry)
+  db.commit()
+
+  return {"message": f"Entry for {entry_date} by User: {person_id} successfully deleted."}
+
 @app.get("/")
 def read_root():
   return {"message": "Hello World"}
